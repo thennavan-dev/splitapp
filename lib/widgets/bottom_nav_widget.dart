@@ -24,6 +24,10 @@ class BottomNavWidget extends StatelessWidget {
           icon: Icon(Icons.people),
           label: 'Users',
         ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.settings),
+          label: 'Settings',
+        ),
       ],
     );
   }

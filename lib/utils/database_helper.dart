@@ -20,7 +20,6 @@ class DatabaseHelper {
       path,
       version: 1,
       onCreate: (db, version) async {
-        // Users table
         await db.execute('''
           CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,7 +27,6 @@ class DatabaseHelper {
           )
         ''');
 
-        // Splits table
         await db.execute('''
           CREATE TABLE splits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +37,6 @@ class DatabaseHelper {
           )
         ''');
 
-        // Split participants table
         await db.execute('''
           CREATE TABLE split_participants (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,7 +50,6 @@ class DatabaseHelper {
     );
   }
 
-  // ---------------- Users ----------------
   Future<List<Map<String, dynamic>>> getUsers() async {
     final db = await database;
     return await db.query('users');
@@ -66,12 +62,14 @@ class DatabaseHelper {
 
   Future<int> deleteUser(int userId) async {
     final db = await database;
-    // Delete from split_participants first to avoid foreign key issues
-    await db.delete('split_participants', where: 'user_id = ?', whereArgs: [userId]);
+    await db.delete(
+      'split_participants',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
     return await db.delete('users', where: 'id = ?', whereArgs: [userId]);
   }
 
-  // ---------------- Splits ----------------
   Future<List<Map<String, dynamic>>> getSplits() async {
     final db = await database;
     return await db.query('splits');
@@ -84,12 +82,14 @@ class DatabaseHelper {
 
   Future<int> deleteSplit(int splitId) async {
     final db = await database;
-    // Delete participants first to avoid foreign key issues
-    await db.delete('split_participants', where: 'split_id = ?', whereArgs: [splitId]);
+    await db.delete(
+      'split_participants',
+      where: 'split_id = ?',
+      whereArgs: [splitId],
+    );
     return await db.delete('splits', where: 'id = ?', whereArgs: [splitId]);
   }
 
-  // ---------------- Split Participants ----------------
   Future<int> addParticipant(int splitId, int userId) async {
     final db = await database;
     return await db.insert('split_participants', {
@@ -109,18 +109,23 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getParticipants(int splitId) async {
     final db = await database;
-    return await db.rawQuery('''
+    return await db.rawQuery(
+      '''
       SELECT u.id, u.user_name FROM users u
       INNER JOIN split_participants sp ON u.id = sp.user_id
       WHERE sp.split_id = ?
-    ''', [splitId]);
+    ''',
+      [splitId],
+    );
   }
 
-  // ---------------- Utility ----------------
   Future<void> clearAllData() async {
-    final db = await database;
-    await db.delete('split_participants');
-    await db.delete('splits');
-    await db.delete('users');
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+
+    final path = join(await getDatabasesPath(), 'splitapp.db');
+    await deleteDatabase(path);
   }
 }

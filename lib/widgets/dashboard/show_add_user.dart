@@ -5,7 +5,7 @@ Future<void> showAddUserDialog(BuildContext context) async {
   final TextEditingController userController = TextEditingController();
   final dbHelper = DatabaseHelper();
 
-  showDialog(
+  await showDialog(
     context: context,
     builder: (BuildContext context) {
       return AlertDialog(
