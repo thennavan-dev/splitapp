@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:splitapp/utils/database_helper.dart';
 
-void showAddSplitDialog(BuildContext context) async {
+Future<void> showAddSplitDialog(BuildContext context) async {
   final dbHelper = DatabaseHelper();
   final users = await dbHelper.getUsers();
 
@@ -10,7 +10,8 @@ void showAddSplitDialog(BuildContext context) async {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('No Users Found'),
-        content: const Text('You need to add at least one user before creating a split.'),
+        content: const Text(
+            'You need to add at least one user before creating a split.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -39,7 +40,6 @@ void showAddSplitDialog(BuildContext context) async {
               const SizedBox(height: 10),
               _buildTextField(amountController, 'Amount', isNumber: true),
               const SizedBox(height: 10),
-
               DropdownButtonFormField<int>(
                 decoration: const InputDecoration(
                   labelText: 'Created By',

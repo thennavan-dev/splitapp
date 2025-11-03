@@ -15,57 +15,112 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    String dbPath = await getDatabasesPath();
-    String path = join(dbPath, 'split_app.db');
-
+    final path = join(await getDatabasesPath(), 'splitapp.db');
     return await openDatabase(
       path,
       version: 1,
-      onCreate: _onCreate,
+      onCreate: (db, version) async {
+        // Users table
+        await db.execute('''
+          CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_name TEXT NOT NULL
+          )
+        ''');
+
+        // Splits table
+        await db.execute('''
+          CREATE TABLE splits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            split_title TEXT NOT NULL,
+            amount REAL NOT NULL,
+            created_by INTEGER NOT NULL,
+            FOREIGN KEY (created_by) REFERENCES users(id)
+          )
+        ''');
+
+        // Split participants table
+        await db.execute('''
+          CREATE TABLE split_participants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            split_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            FOREIGN KEY (split_id) REFERENCES splits(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+          )
+        ''');
+      },
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE user (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_name TEXT NOT NULL
-      )
-    ''');
-
-    await db.execute('''
-      CREATE TABLE split (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        split_title TEXT NOT NULL,
-        amount REAL NOT NULL,
-        created_by INTEGER,
-        FOREIGN KEY (created_by) REFERENCES user (id)
-      )
-    ''');
+  // ---------------- Users ----------------
+  Future<List<Map<String, dynamic>>> getUsers() async {
+    final db = await database;
+    return await db.query('users');
   }
 
   Future<int> insertUser(Map<String, dynamic> user) async {
     final db = await database;
-    return await db.insert('user', user);
+    return await db.insert('users', user);
   }
 
-  Future<List<Map<String, dynamic>>> getUsers() async {
+  Future<int> deleteUser(int userId) async {
     final db = await database;
-    return await db.query('user');
+    // Delete from split_participants first to avoid foreign key issues
+    await db.delete('split_participants', where: 'user_id = ?', whereArgs: [userId]);
+    return await db.delete('users', where: 'id = ?', whereArgs: [userId]);
+  }
+
+  // ---------------- Splits ----------------
+  Future<List<Map<String, dynamic>>> getSplits() async {
+    final db = await database;
+    return await db.query('splits');
   }
 
   Future<int> insertSplit(Map<String, dynamic> split) async {
     final db = await database;
-    return await db.insert('split', split);
+    return await db.insert('splits', split);
   }
 
-  Future<List<Map<String, dynamic>>> getSplits() async {
+  Future<int> deleteSplit(int splitId) async {
     final db = await database;
-    return await db.query('split');
+    // Delete participants first to avoid foreign key issues
+    await db.delete('split_participants', where: 'split_id = ?', whereArgs: [splitId]);
+    return await db.delete('splits', where: 'id = ?', whereArgs: [splitId]);
   }
 
-  Future<void> close() async {
+  // ---------------- Split Participants ----------------
+  Future<int> addParticipant(int splitId, int userId) async {
     final db = await database;
-    db.close();
+    return await db.insert('split_participants', {
+      'split_id': splitId,
+      'user_id': userId,
+    });
+  }
+
+  Future<int> removeParticipant(int splitId, int userId) async {
+    final db = await database;
+    return await db.delete(
+      'split_participants',
+      where: 'split_id = ? AND user_id = ?',
+      whereArgs: [splitId, userId],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getParticipants(int splitId) async {
+    final db = await database;
+    return await db.rawQuery('''
+      SELECT u.id, u.user_name FROM users u
+      INNER JOIN split_participants sp ON u.id = sp.user_id
+      WHERE sp.split_id = ?
+    ''', [splitId]);
+  }
+
+  // ---------------- Utility ----------------
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.delete('split_participants');
+    await db.delete('splits');
+    await db.delete('users');
   }
 }
