@@ -29,14 +29,29 @@ class SavePdf {
               pw.Text('Generated: ${DateTime.now()}'),
               pw.SizedBox(height: 12),
               pw.Table.fromTextArray(
-                headers: ['User', 'Amount'],
-                data: summary.map((s) {
-                  final name = s['name'] ?? '';
-                  final amount = s['amount'] is num
-                      ? (s['amount'] as num).toStringAsFixed(2)
-                      : s['amount'].toString();
-                  return [name, amount];
-                }).toList(),
+                headers: ['User', 'To', 'Amount'],
+                data: () {
+                  final rows = <List<String>>[];
+                  for (final s in summary) {
+                    final name = s['name'] ?? '';
+                    final details = s['details'];
+                    if (details is List && details.isNotEmpty) {
+                      for (final d in details) {
+                        final to = d['to'] ?? '';
+                        final amount = d['amount'] is num
+                            ? (d['amount'] as num).toStringAsFixed(2)
+                            : d['amount'].toString();
+                        rows.add([name, to, amount]);
+                      }
+                    } else {
+                      final amount = s['amount'] is num
+                          ? (s['amount'] as num).toStringAsFixed(2)
+                          : s['amount'].toString();
+                      rows.add([name, '', amount]);
+                    }
+                  }
+                  return rows;
+                }(),
               ),
             ];
           },
@@ -64,7 +79,8 @@ class SavePdf {
       if (targetDir == null) {
         try {
           final dirs = await getExternalStorageDirectories(
-              type: StorageDirectory.documents);
+            type: StorageDirectory.documents,
+          );
           if (dirs != null && dirs.isNotEmpty) {
             targetDir = dirs.first;
           }
@@ -73,7 +89,36 @@ class SavePdf {
         targetDir ??= await getApplicationDocumentsDirectory();
       }
 
-      final splitDir = Directory(p.join(targetDir.path, 'splitapp'));
+      Directory target = targetDir;
+
+      try {
+        if (Platform.isAndroid) {
+          final publicDocs = Directory('/storage/emulated/0/Documents');
+          try {
+            if (!await publicDocs.exists()) {
+              await publicDocs.create(recursive: true);
+            }
+          } catch (_) {}
+
+          if (await publicDocs.exists()) {
+            target = publicDocs;
+          } else {
+            final pathStr = target.path.replaceAll('\\', '/');
+            final idx = pathStr.indexOf('/Android/data');
+            if (idx != -1) {
+              final derived = pathStr.substring(0, idx) + '/Documents';
+              final derivedDir = Directory(derived);
+              try {
+                if (!await derivedDir.exists())
+                  await derivedDir.create(recursive: true);
+              } catch (_) {}
+              if (await derivedDir.exists()) target = derivedDir;
+            }
+          }
+        }
+      } catch (_) {}
+
+      final splitDir = Directory(p.join(target.path, 'splitapp'));
       if (!await splitDir.exists()) {
         await splitDir.create(recursive: true);
       }

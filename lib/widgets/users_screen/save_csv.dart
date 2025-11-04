@@ -11,18 +11,30 @@ class SaveCsv {
     String fileName,
   ) async {
     try {
-      final header = 'User,Amount\n';
-      final rows = summary
-          .map((row) {
-            final name = row['name'] ?? '';
-            final amount = row['amount'] is num
-                ? (row['amount'] as num).toStringAsFixed(2)
-                : row['amount'].toString();
-            return '"$name",$amount';
-          })
-          .join('\n');
+      final header = 'User,To,Amount\n';
+      final rows = <String>[];
 
-      final csv = '$header$rows';
+      for (final row in summary) {
+        final name = row['name'] ?? '';
+        final details = row['details'];
+
+        if (details is List && details.isNotEmpty) {
+          for (final d in details) {
+            final to = d['to'] ?? '';
+            final amount = d['amount'] is num
+                ? (d['amount'] as num).toStringAsFixed(2)
+                : d['amount'].toString();
+            rows.add('"$name","$to",$amount');
+          }
+        } else {
+          final amount = row['amount'] is num
+              ? (row['amount'] as num).toStringAsFixed(2)
+              : row['amount'].toString();
+          rows.add('"$name","",$amount');
+        }
+      }
+
+      final csv = '$header${rows.join('\n')}';
       Directory? targetDir;
 
       try {
@@ -42,7 +54,8 @@ class SaveCsv {
       if (targetDir == null) {
         try {
           final dirs = await getExternalStorageDirectories(
-              type: StorageDirectory.documents);
+            type: StorageDirectory.documents,
+          );
           if (dirs != null && dirs.isNotEmpty) {
             targetDir = dirs.first;
           }
@@ -51,7 +64,36 @@ class SaveCsv {
         targetDir ??= await getApplicationDocumentsDirectory();
       }
 
-      final splitDir = Directory(p.join(targetDir.path, 'splitapp'));
+      Directory target = targetDir;
+
+      try {
+        if (Platform.isAndroid) {
+          final publicDocs = Directory('/storage/emulated/0/Documents');
+          try {
+            if (!await publicDocs.exists()) {
+              await publicDocs.create(recursive: true);
+            }
+          } catch (_) {}
+
+          if (await publicDocs.exists()) {
+            target = publicDocs;
+          } else {
+            final pathStr = target.path.replaceAll('\\', '/');
+            final idx = pathStr.indexOf('/Android/data');
+            if (idx != -1) {
+              final derived = pathStr.substring(0, idx) + '/Documents';
+              final derivedDir = Directory(derived);
+              try {
+                if (!await derivedDir.exists())
+                  await derivedDir.create(recursive: true);
+              } catch (_) {}
+              if (await derivedDir.exists()) target = derivedDir;
+            }
+          }
+        }
+      } catch (_) {}
+
+      final splitDir = Directory(p.join(target.path, 'splitapp'));
       if (!await splitDir.exists()) {
         await splitDir.create(recursive: true);
       }

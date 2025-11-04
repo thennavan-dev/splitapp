@@ -150,14 +150,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     pendingToPay[u] = pending;
                   }
 
-                  final summary = _users
-                      .map(
-                        (u) => {
-                          'name': u['user_name'],
-                          'amount': pendingToPay[u['id'] as int] ?? 0.0,
-                        },
-                      )
-                      .toList();
+                  final userMap = {for (var u in _users) u['id'] as int: u['user_name'] as String};
+
+                  final summary = _users.map((u) {
+                    final uid = u['id'] as int;
+                    final name = u['user_name'] as String;
+                    final details = <Map<String, dynamic>>[];
+                    double total = 0.0;
+
+                    for (var v in debts.keys) {
+                      if (u['id'] == v) continue;
+                      final userOwes = debts[uid]?[v] ?? 0.0;
+                      final otherOwes = debts[v]?[uid] ?? 0.0;
+                      final net = (userOwes - otherOwes) > 0 ? (userOwes - otherOwes) : 0.0;
+                      if (net > 0) {
+                        details.add({'to': userMap[v] ?? 'Unknown', 'amount': net});
+                        total += net;
+                      }
+                    }
+
+                    return {
+                      'name': name,
+                      'amount': total,
+                      'details': details,
+                    };
+                  }).toList();
 
                   if (!mounted) return;
 
